@@ -25,6 +25,63 @@ except Exception as e:
     st.error(f"Error al cargar `Produccion.xlsx`: {e}")
     df_produccion = pd.DataFrame()
 
+## Problemática 10 (Ajustada): Rendimiento Promedio de Tallos por Postcosecha por Jornada
+
+if not df_produccion.empty and 'Postcosecha' in df_produccion.columns and 'FechaJornada' in df_produccion.columns and 'Tallos' in df_produccion.columns:
+    df_produccion_clean = df_produccion.copy()
+    df_produccion_clean['Postcosecha'] = df_produccion_clean['Postcosecha'].astype(str)
+
+    # Sumar tallos por Postcosecha y jornada
+    rendimiento_diario_postcosecha = df_produccion_clean.groupby(['Postcosecha', 'FechaJornada'])['Tallos'].sum().reset_index()
+    rendimiento_diario_postcosecha.rename(columns={'Tallos': 'Tallos_Producidos'}, inplace=True)
+
+    # Calcular el promedio de rendimiento por Postcosecha a lo largo del tiempo
+    rendimiento_promedio_por_postcosecha = rendimiento_diario_postcosecha.groupby('Postcosecha')['Tallos_Producidos'].mean().sort_values(ascending=False).head(15).reset_index()
+
+    if not rendimiento_promedio_por_postcosecha.empty:
+        st.subheader('Top 15 Postcosechas por Rendimiento Promedio de Tallos por Jornada')
+        fig_rendimiento_bar, ax_rendimiento_bar = plt.subplots(figsize=(14, 8))
+        sns.barplot(x='Postcosecha', y='Tallos_Producidos', hue='Postcosecha', data=rendimiento_promedio_por_postcosecha, palette='Spectral', legend=False, ax=ax_rendimiento_bar)
+        ax_rendimiento_bar.set_title('Top 15 Postcosechas por Rendimiento Promedio de Tallos por Jornada')
+        ax_rendimiento_bar.set_xlabel('Postcosecha')
+        ax_rendimiento_bar.set_ylabel('Promedio de Tallos Producidos por Jornada')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+
+        # Formatear el eje Y
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_rendimiento_bar.yaxis.set_major_formatter(formatter)
+        ax_rendimiento_bar.ticklabel_format(style='plain', axis='y')
+
+        st.pyplot(fig_rendimiento_bar)
+        plt.close(fig_rendimiento_bar) # CERRAR LA FIGURA
+
+        st.subheader('Distribución del Rendimiento Diario de Tallos por Postcosecha')
+        # Opcional: Para ver la distribución general del rendimiento diario por Postcosecha
+        fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
+        sns.histplot(rendimiento_diario_postcosecha['Tallos_Producidos'], bins=30, kde=True, color='skyblue', ax=ax_hist)
+        ax_hist.set_title('Distribución del Rendimiento Diario de Tallos por Postcosecha')
+        ax_hist.set_xlabel('Tallos Producidos por Jornada')
+        ax_hist.set_ylabel('Frecuencia')
+        plt.tight_layout()
+
+        # Formatear el eje X (Tallos Producidos)
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_hist.xaxis.set_major_formatter(formatter)
+        ax_hist.ticklabel_format(style='plain', axis='x')
+
+        st.pyplot(fig_hist)
+        plt.close(fig_hist) # CERRAR LA FIGURA
+
+    else:
+        st.info("No hay datos de producción con información de Postcosecha y FechaJornada para calcular el rendimiento.")
+else:
+    st.warning("No se puede realizar el análisis de 'Rendimiento Promedio de Tallos por Postcosecha por Jornada'. Asegúrate de que `df_produccion` esté cargado y contenga las columnas 'Tallos', 'Postcosecha' y 'FechaJornada'.")
+
+st.success("¡Todos los análisis se han intentado generar! Revisa los mensajes de información y advertencia para cualquier detalle.")
+
 # Cargar y procesar 'Causa agrupado.xlsx'
 # Parte 1: Tabla de mapeo de causas (Columnas B y C)
 try:
