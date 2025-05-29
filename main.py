@@ -452,47 +452,57 @@ else:
 
 st.success("Análisis completado. ¡Explora tus datos!")
 
-## Problemática 8: Distribución de Producción por Grado de Calidad
-
+## Problemática 9: Distribución de Producción por Grado de Calidad
 if not df_produccion.empty and 'Grado' in df_produccion.columns and 'Tallos' in df_produccion.columns:
+    # Agrupar por grado y sumar tallos
     produccion_por_grado = df_produccion.groupby('Grado')['Tallos'].sum().reset_index()
 
-    if not produccion_por_grado.empty:
-        # Calcular el porcentaje para el gráfico de pastel o para etiquetas
+    if not produccion_por_grado.empty and produccion_por_grado['Tallos'].sum() > 0:
+        # Calcular el porcentaje de participación
         produccion_por_grado['Porcentaje'] = (produccion_por_grado['Tallos'] / produccion_por_grado['Tallos'].sum()) * 100
 
+        # Gráfico de pastel
         st.subheader('Distribución Porcentual de Tallos Producidos por Grado de Calidad')
-        fig_pie, ax_pie = plt.subplots(figsize=(10, 10))
-        # Gráfico de pastel:
-        ax_pie.pie(produccion_por_grado['Tallos'], labels=produccion_por_grado['Grado'], autopct='%1.1f%%', startangle=90, colors=sns.color_palette("pastel"))
+        fig_pie, ax_pie = plt.subplots(figsize=(8, 8))
+        ax_pie.pie(
+            produccion_por_grado['Tallos'],
+            labels=produccion_por_grado['Grado'],
+            autopct='%1.1f%%',
+            startangle=90,
+            colors=sns.color_palette("pastel")
+        )
         ax_pie.set_title('Distribución Porcentual de Tallos Producidos por Grado de Calidad')
-        ax_pie.axis('equal') # Para que el pastel sea un círculo
-        plt.tight_layout()
-        st.pyplot(fig_pie)
+        ax_pie.axis('equal')  # Asegura que el pastel sea circular
+        st.pyplot(fig_pie)    # Mostrar en Streamlit
 
+        # Gráfico de barras
         st.subheader('Total de Tallos Producidos por Grado de Calidad (Gráfico de Barras)')
-        # Gráfico de barras para mejor comparación visual de magnitudes
-        fig_bar_grado, ax_bar_grado = plt.subplots(figsize=(12, 7))
-        sns.barplot(x='Grado', y='Tallos', hue='Grado', data=produccion_por_grado.sort_values(by='Tallos', ascending=False), palette='coolwarm', legend=False, ax=ax_bar_grado)
-        ax_bar_grado.set_title('Total de Tallos Producidos por Grado de Calidad')
-        ax_bar_grado.set_xlabel('Grado de Calidad')
-        ax_bar_grado.set_ylabel('Total de Tallos')
+        fig_bar, ax_bar = plt.subplots(figsize=(12, 6))
+        sns.barplot(
+            data=produccion_por_grado.sort_values(by='Tallos', ascending=False),
+            x='Grado',
+            y='Tallos',
+            palette='coolwarm',
+            ax=ax_bar
+        )
+        ax_bar.set_title('Total de Tallos Producidos por Grado de Calidad')
+        ax_bar.set_xlabel('Grado de Calidad')
+        ax_bar.set_ylabel('Total de Tallos')
         plt.xticks(rotation=45, ha='right')
-        plt.tight_layout()
 
-        # Formatear el eje Y para evitar notación científica y mostrar enteros
+        # Formatear el eje Y
         formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
         formatter.set_scientific(False)
-        ax_bar_grado.yaxis.set_major_formatter(formatter)
-        ax_bar_grado.ticklabel_format(style='plain', axis='y')
+        ax_bar.yaxis.set_major_formatter(formatter)
+        ax_bar.ticklabel_format(style='plain', axis='y')
 
-        st.pyplot(fig_bar_grado)
+        st.pyplot(fig_bar)  # Mostrar en Streamlit
+
     else:
-        st.info("No se encontraron datos de producción por grado para el análisis.")
+        st.info("No se encontraron datos válidos de producción por grado para graficar.")
 else:
     st.warning("No se puede realizar el análisis de 'Distribución de Producción por Grado de Calidad'. Asegúrate de que `df_produccion` esté cargado y contenga las columnas 'Grado' y 'Tallos'.")
-
-## Problemática 09: Impacto de Mala Marcación en Descarte de Tallos (NCP)
+## Problemática 10: Impacto de Mala Marcación en Descarte de Tallos (NCP)
 
 if not df_ncp.empty and 'Causa' in df_ncp.columns and 'Tallos' in df_ncp.columns:
     causas_marcacion_incorrecta = ['MALA MARCACION', 'MARCACIÓN INCORRECTA', 'ETIQUETA MAL IMPRESA']
@@ -528,7 +538,7 @@ if not df_ncp.empty and 'Causa' in df_ncp.columns and 'Tallos' in df_ncp.columns
 else:
     st.warning("No se puede realizar el análisis de 'Impacto de Mala Marcación'. Asegúrate de que `df_ncp` esté cargado y contenga las columnas 'Causa' y 'Tallos'.")
 
-## Problemática 10 (Ajustada): Rendimiento Promedio de Tallos por Postcosecha por Jornada
+## Problemática 11 (Ajustada): Rendimiento Promedio de Tallos por Postcosecha por Jornada
 
 if not df_produccion.empty and 'Postcosecha' in df_produccion.columns and 'FechaJornada' in df_produccion.columns and 'Tallos' in df_produccion.columns:
     df_produccion_clean = df_produccion.copy()
