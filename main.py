@@ -111,8 +111,6 @@ except Exception as e:
     st.error(f"Error al cargar `NCP.csv`: {e}")
     df_ncp = pd.DataFrame()
 
----
-
 ## Limpieza y Conversión de Datos
 
 # Convertir columnas de fecha en formato datetime
@@ -138,8 +136,6 @@ for df in [df_produccion, df_ncc, df_ncp]:
 
 st.success("Limpieza y conversión de datos completada.")
 
----
-
 ## Uniendo DataFrames
 
 # Unir la tabla de mapeo de causas (df_causa_mapeo) con 'Produccion', 'NCC' y 'NCP'
@@ -161,8 +157,6 @@ if not df_ncp.empty and not df_causa_mapeo.empty:
 else:
     st.warning("No se pudo unir `df_ncp` con `df_causa_mapeo` (uno o ambos están vacíos).")
 
----
-
 ## Verificación de Datos Cargados y Procesados
 
 if not df_inspeccion_causas.empty:
@@ -172,8 +166,6 @@ if not df_inspeccion_causas.empty:
     st.write(df_inspeccion_causas.columns.tolist())
 else:
     st.warning("La tabla de Inspección de Plagas/Enfermedades está vacía o no se cargó correctamente.")
-
----
 
 ## Análisis y Visualizaciones
 
