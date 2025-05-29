@@ -659,3 +659,311 @@ else:
 
 st.success("Análisis completado. ¡Explora tus datos!")
 
+st.subheader("Problemática 15: Porcentaje de Producción Descartada por Plagas/Enfermedades por Finca")
+
+if not df_produccion.empty and not df_ncp.empty:
+    # Definir las causas de plagas/enfermedades
+    causas_plagas_enfermedades = [
+        'DAÑO POR THRIPS', 'ACAROS', 'PRESENCIA DE THRIPS', 'MILDEO POLVOSO',
+        'AFIDOS', 'MINADOR', 'MOSCA BLANCA', 'BOTRYTIS', 'ESCLEROTINEA',
+        'PROBLEMA FITOSANITARIO', 'ROYA PARDA'
+    ]
+
+    # Asegurarse de que 'Finca' exista en ambos DataFrames y sean strings
+    if 'Finca' in df_produccion.columns and 'Finca' in df_ncp.columns and 'Tallos' in df_produccion.columns and 'Tallos' in df_ncp.columns and 'Causa' in df_ncp.columns:
+        df_produccion_clean_finca = df_produccion.copy()
+        df_ncp_clean_finca = df_ncp.copy()
+
+        df_produccion_clean_finca['Finca'] = df_produccion_clean_finca['Finca'].astype(str)
+        df_ncp_clean_finca['Finca'] = df_ncp_clean_finca['Finca'].astype(str)
+        df_ncp_clean_finca['Causa'] = df_ncp_clean_finca['Causa'].astype(str)
+
+
+        # 1. Tallos descartados por plagas/enfermedades por finca (de df_ncp)
+        # Usamos la columna 'Causa' para filtrar según la lista de causas específicas
+        descartes_plagas_finca = df_ncp_clean_finca[df_ncp_clean_finca['Causa'].isin(causas_plagas_enfermedades)]
+        descartes_plagas_finca_sum = descartes_plagas_finca.groupby('Finca')['Tallos'].sum().reset_index(name='TallosDescartadosPlagas')
+
+        # 2. Producción total por finca (de df_produccion)
+        produccion_total_finca = df_produccion_clean_finca.groupby('Finca')['Tallos'].sum().reset_index(name='ProduccionTotalFinca')
+
+        # 3. Unir los datos
+        merged_impacto = pd.merge(produccion_total_finca, descartes_plagas_finca_sum, on='Finca', how='left').fillna(0)
+
+        # 4. Calcular el porcentaje
+        # Evitar división por cero
+        merged_impacto['Porcentaje_Descarte_Plagas'] = np.where(
+            merged_impacto['ProduccionTotalFinca'] > 0,
+            (merged_impacto['TallosDescartadosPlagas'] / merged_impacto['ProduccionTotalFinca']) * 100,
+            0
+        )
+
+        merged_impacto = merged_impacto.sort_values(by='Porcentaje_Descarte_Plagas', ascending=False)
+
+        if not merged_impacto.empty:
+            st.write("### Impacto de Plagas/Enfermedades en la Producción por Finca:")
+            st.dataframe(merged_impacto.head()) # Muestra la tabla en Streamlit
+
+            fig, ax = plt.subplots(figsize=(12, 7)) # Crear la figura y los ejes
+            sns.barplot(x='Finca', y='Porcentaje_Descarte_Plagas', hue='Finca', data=merged_impacto.head(10), palette='YlOrRd', legend=False, ax=ax)
+            ax.set_title('Top 10 Fincas por % de Producción Descartada por Plagas/Enfermedades')
+            ax.set_xlabel('Finca')
+            ax.set_ylabel('Porcentaje Descartado por Plagas/Enfermedades (%)')
+            plt.xticks(rotation=45, ha='right')
+            plt.tight_layout()
+            st.pyplot(fig) # Muestra el gráfico en Streamlit
+            plt.close(fig) # ¡CERRAR LA FIGURA!
+
+        else:
+            st.info("No hay datos suficientes para calcular el porcentaje de descarte por plagas/enfermedades por finca.")
+    else:
+        st.warning("Las columnas 'Finca', 'Tallos' o 'Causa' no se encontraron en los DataFrames necesarios para este análisis.")
+else:
+    st.warning("Uno o ambos DataFrames (df_produccion, df_ncp) están vacíos para este análisis.")
+
+st.subheader("Problemática 15 (Mejorada): Porcentaje de Producción Descartada por Plagas/Enfermedades por Finca y Causa")
+
+if not df_produccion.empty and not df_ncp.empty:
+    # Definir las causas de plagas/enfermedades
+    causas_plagas_enfermedades = [
+        'DAÑO POR THRIPS', 'ACAROS', 'PRESENCIA DE THRIPS', 'MILDEO POLVOSO',
+        'AFIDOS', 'MINADOR', 'MOSCA BLANCA', 'BOTRYTIS', 'ESCLEROTINEA',
+        'PROBLEMA FITOSANITARIO', 'ROYA PARDA'
+    ]
+
+    # Determinar qué columna usar para las causas (priorizar CausaAgrupada)
+    causa_col = 'CausaAgrupada' if 'CausaAgrupada' in df_ncp.columns and not df_ncp['CausaAgrupada'].isnull().all() else 'Causa'
+
+    # Asegurarse de que las columnas necesarias existan y sean del tipo correcto
+    if 'Finca' in df_produccion.columns and 'Finca' in df_ncp.columns and \
+       'Tallos' in df_produccion.columns and 'Tallos' in df_ncp.columns and \
+       'Causa' in df_ncp.columns: # 'Causa' es necesaria para el filtro inicial, luego usamos 'causa_col'
+
+        df_produccion_temp = df_produccion.copy()
+        df_ncp_temp = df_ncp.copy()
+
+        df_produccion_temp['Finca'] = df_produccion_temp['Finca'].astype(str)
+        df_ncp_temp['Finca'] = df_ncp_temp['Finca'].astype(str)
+        df_ncp_temp['Causa'] = df_ncp_temp['Causa'].astype(str) # Asegurar que 'Causa' sea string para el filtro
+        # Asegurar que la columna elegida para 'causa_col' también sea string si existe
+        if causa_col in df_ncp_temp.columns:
+            df_ncp_temp[causa_col] = df_ncp_temp[causa_col].astype(str)
+
+
+        # 1. Tallos descartados por plagas/enfermedades por finca Y causa
+        descartes_plagas_por_finca_causa = df_ncp_temp[df_ncp_temp['Causa'].isin(causas_plagas_enfermedades)].copy()
+
+        if not descartes_plagas_por_finca_causa.empty:
+            descartes_plagas_por_finca_causa_sum = descartes_plagas_por_finca_causa.groupby(['Finca', causa_col])['Tallos'].sum().reset_index(name='TallosDescartadosPlagas')
+
+            # 2. Producción total por finca
+            produccion_total_finca = df_produccion_temp.groupby('Finca')['Tallos'].sum().reset_index(name='ProduccionTotalFinca')
+
+            # 3. Unir los datos para calcular el porcentaje
+            # Merge descartes_plagas_por_finca_causa_sum con produccion_total_finca
+            merged_impacto_causa = pd.merge(descartes_plagas_por_finca_causa_sum, produccion_total_finca, on='Finca', how='left').fillna(0)
+
+            # 4. Calcular el porcentaje de cada causa de descarte de plagas sobre la producción total de la finca
+            merged_impacto_causa['Porcentaje_Descarte_Plagas'] = np.where(
+                merged_impacto_causa['ProduccionTotalFinca'] > 0,
+                (merged_impacto_causa['TallosDescartadosPlagas'] / merged_impacto_causa['ProduccionTotalFinca']) * 100,
+                0
+            )
+
+            # Filtrar para mostrar solo las fincas con algún descarte por plagas significativo
+            # Puedes ajustar este umbral si quieres mostrar más o menos fincas
+            merged_impacto_causa_filtered = merged_impacto_causa[merged_impacto_causa['Porcentaje_Descarte_Plagas'] > 0].copy()
+
+            if not merged_impacto_causa_filtered.empty:
+                # Opcional: Para evitar un gráfico con demasiadas fincas, selecciona las top N por porcentaje total
+                # Calcula el porcentaje total de descarte por plagas por finca para ordenar
+                finca_total_pct = merged_impacto_causa_filtered.groupby('Finca')['Porcentaje_Descarte_Plagas'].sum().sort_values(ascending=False).head(10).index
+                merged_impacto_causa_filtered = merged_impacto_causa_filtered[merged_impacto_causa_filtered['Finca'].isin(finca_total_pct)]
+
+                # Ordenar para la visualización en el gráfico
+                # Esto asegura que las fincas se muestren en el orden del top por su porcentaje total
+                merged_impacto_causa_filtered['Finca_Order'] = pd.Categorical(merged_impacto_causa_filtered['Finca'], categories=finca_total_pct, ordered=True)
+                merged_impacto_causa_filtered = merged_impacto_causa_filtered.sort_values('Finca_Order')
+
+                st.write("### Desglose del Impacto de Plagas/Enfermedades por Finca y Causa:")
+                st.dataframe(merged_impacto_causa_filtered) # Muestra la tabla en Streamlit
+
+                fig, ax = plt.subplots(figsize=(14, 8)) # Crea la figura y los ejes
+                sns.barplot(
+                    x='Finca_Order', # Usar la columna ordenada para el eje X
+                    y='Porcentaje_Descarte_Plagas',
+                    hue=causa_col, # <--- ¡Aquí se agrega el desglose por causa!
+                    data=merged_impacto_causa_filtered,
+                    palette='tab20', # Una paleta con muchos colores distintos para las causas
+                    ax=ax # Pasa los ejes al gráfico
+                )
+                ax.set_title('Porcentaje de Producción Descartada por Plagas/Enfermedades por Finca y Causa')
+                ax.set_xlabel('Finca')
+                ax.set_ylabel('Porcentaje Descartado por Plagas/Enfermedades (%)')
+                plt.xticks(rotation=45, ha='right')
+                plt.legend(title='Causa de Descarte', bbox_to_anchor=(1.02, 1), loc='upper left') # Mueve la leyenda fuera del gráfico
+                plt.tight_layout()
+                st.pyplot(fig) # Muestra el gráfico en Streamlit
+                plt.close(fig) # ¡Cierra la figura para liberar memoria!
+
+            else:
+                st.info("No se encontraron descartes de plagas/enfermedades con un porcentaje significativo para graficar después del filtrado.")
+        else:
+            st.info("No se encontraron tallos descartados por plagas/enfermedades en NCP para este análisis.")
+    else:
+        st.warning("Las columnas **'Finca'**, **'Tallos'** o **'Causa'** no se encontraron en los DataFrames necesarios para este análisis. Asegúrate de que `df_produccion` y `df_ncp` contengan estas columnas.")
+else:
+    st.warning("Uno o ambos DataFrames (**`df_produccion`**, **`df_ncp`**) están vacíos para este análisis. Asegúrate de que los datos se hayan cargado correctamente.")
+
+st.subheader("Problemática 16: Relación entre Finca, Causas de Descarte (NCP) y Producto")
+
+if not df_ncp.empty:
+    # Columnas a usar
+    causa_col = 'CausaAgrupada' if 'CausaAgrupada' in df_ncp.columns and not df_ncp['CausaAgrupada'].isnull().all() else 'Causa'
+
+    # Priorizar ProductoMaestro, si no, usar Producto
+    producto_col = 'ProductoMaestro' if 'ProductoMaestro' in df_ncp.columns and not df_ncp['ProductoMaestro'].isnull().all() else 'Producto'
+
+    # Verificar que las columnas clave existan antes de proceder
+    if 'Finca' in df_ncp.columns and producto_col in df_ncp.columns and causa_col in df_ncp.columns and 'Tallos' in df_ncp.columns:
+        df_ncp_filtered = df_ncp[df_ncp['Tallos'] > 0].copy()
+
+        # Asegurar que las columnas sean de tipo string para agrupación segura
+        df_ncp_filtered['Finca'] = df_ncp_filtered['Finca'].astype(str)
+        df_ncp_filtered[causa_col] = df_ncp_filtered[causa_col].astype(str)
+        df_ncp_filtered[producto_col] = df_ncp_filtered[producto_col].astype(str)
+
+
+        # Agrupar y sumar tallos
+        ncp_finca_causa_producto = df_ncp_filtered.groupby(['Finca', causa_col, producto_col])['Tallos'].sum().reset_index()
+
+        if not ncp_finca_causa_producto.empty:
+            # Seleccionar las top N fincas por total de descartes para mejor legibilidad
+            top_fincas = ncp_finca_causa_producto.groupby('Finca')['Tallos'].sum().nlargest(5).index.tolist() # Top 5 fincas
+            ncp_finca_causa_producto_top = ncp_finca_causa_producto[ncp_finca_causa_producto['Finca'].isin(top_fincas)]
+
+            if not ncp_finca_causa_producto_top.empty:
+                st.write(f"### Top 5 Fincas con Descarte por Finca, Causa y {producto_col}:")
+                st.dataframe(ncp_finca_causa_producto_top) # Muestra el DataFrame en Streamlit
+
+                # Crear un FacetGrid para dividir por Finca
+                # `plt.figure()` no se usa directamente con FacetGrid, pero el método `map_dataframe`
+                # crea figuras implícitamente o utiliza la figura actual si se provee.
+                # Para Streamlit, es mejor dejar que FacetGrid cree la figura y luego pasarla.
+                g = sns.FacetGrid(ncp_finca_causa_producto_top, col='Finca', col_wrap=3, height=5, aspect=1.2, sharey=False)
+
+                # Mapear un barplot para cada faceta
+                g.map_dataframe(sns.barplot, x=causa_col, y='Tallos', hue=producto_col, palette='tab20')
+
+                # Ajustar títulos y etiquetas
+                g.set_axis_labels(f"Causa de Descarte ({causa_col})", "Tallos Descartados")
+                g.set_titles(col_template="Finca: {col_name}") # Título más descriptivo para cada columna (finca)
+                g.set_xticklabels(rotation=45, ha='right')
+                g.add_legend(title=producto_col, bbox_to_anchor=(1.02, 1), loc='upper left') # Leyenda externa
+
+                g.figure.suptitle(f'Tallos Descartados (NCP) por Finca, Causa y {producto_col}', y=1.02, fontsize=16) # Título general para la figura
+                plt.tight_layout(rect=[0, 0, 1, 0.98]) # Ajusta el layout para dar espacio al suptitle y la leyenda
+
+                st.pyplot(g.figure) # Muestra la figura completa generada por FacetGrid
+                plt.close(g.figure) # ¡Cierra la figura para liberar memoria!
+
+            else:
+                st.info("No se encontraron descartes significativos en las fincas seleccionadas para el desglose.")
+        else:
+            st.info("No se encontraron descartes (NCP) con datos completos de Finca, Causa y Producto después de la agrupación.")
+    else:
+        st.warning(f"Las columnas **'Finca'**, **'Tallos'**, **'{producto_col}'** o **'{causa_col}'** no se encontraron en `df_ncp`. Asegúrate de que los nombres de las columnas son correctos.")
+else:
+    st.warning("`df_ncp` está vacío. Asegúrate de que los datos se hayan cargado correctamente para analizar la relación entre Finca, Causas de Descarte y Producto.")
+
+
+st.subheader("Mapa de Calor: Porcentaje de Aceptación por Finca y Producto")
+
+if not df_produccion.empty and not df_ncp.empty:
+    # Priorizar ProductoMaestro, si no, usar Producto para ambos DataFrames
+    producto_col_prod = 'ProductoMaestro' if 'ProductoMaestro' in df_produccion.columns and not df_produccion['ProductoMaestro'].isnull().all() else 'Producto'
+    producto_col_ncp = 'ProductoMaestro' if 'ProductoMaestro' in df_ncp.columns and not df_ncp['ProductoMaestro'].isnull().all() else 'Producto'
+
+    # Verificar que las columnas clave existan antes de proceder
+    if 'Finca' in df_produccion.columns and producto_col_prod in df_produccion.columns and 'Tallos' in df_produccion.columns and \
+       'Finca' in df_ncp.columns and producto_col_ncp in df_ncp.columns and 'Tallos' in df_ncp.columns:
+
+        # Crear copias para evitar SettingWithCopyWarning
+        df_produccion_temp = df_produccion.copy()
+        df_ncp_temp = df_ncp.copy()
+
+        # Asegurarse de que las columnas sean string
+        df_produccion_temp['Finca'] = df_produccion_temp['Finca'].astype(str)
+        df_produccion_temp[producto_col_prod] = df_produccion_temp[producto_col_prod].astype(str)
+        df_ncp_temp['Finca'] = df_ncp_temp['Finca'].astype(str)
+        df_ncp_temp[producto_col_ncp] = df_ncp_temp[producto_col_ncp].astype(str)
+
+        # 1. Calcular la producción total por Finca y Producto
+        produccion_total_agrupada = df_produccion_temp.groupby(['Finca', producto_col_prod])['Tallos'].sum().reset_index(name='ProduccionTotal')
+
+        # 2. Calcular los descartes (NCP) por Finca y Producto
+        descartes_ncp_agrupados = df_ncp_temp.groupby(['Finca', producto_col_ncp])['Tallos'].sum().reset_index(name='TallosDescartadosNCP')
+
+        # 3. Unir ambos DataFrames para calcular la aceptación
+        # Alinear los nombres de las columnas de producto para el merge
+        descartes_ncp_agrupados.rename(columns={producto_col_ncp: producto_col_prod}, inplace=True)
+
+        merged_data = pd.merge(
+            produccion_total_agrupada,
+            descartes_ncp_agrupados,
+            on=['Finca', producto_col_prod],
+            how='left'
+        ).fillna(0) # Rellenar con 0 si no hay descartes para una combinación
+
+        # 4. Calcular Tallos Aceptados y Porcentaje de Aceptación
+        merged_data['TallosAceptados'] = merged_data['ProduccionTotal'] - merged_data['TallosDescartadosNCP']
+
+        merged_data['PorcentajeAceptacion'] = np.where(
+            merged_data['ProduccionTotal'] > 0,
+            (merged_data['TallosAceptados'] / merged_data['ProduccionTotal']) * 100,
+            0 # Si no hay producción, el porcentaje de aceptación es 0
+        )
+
+        # Opcional: Mostrar los datos procesados para depuración
+        st.write("### Datos para el Mapa de Calor (Primeras Filas):")
+        st.dataframe(merged_data.head())
+
+        # Crear la tabla pivote para el mapa de calor del porcentaje de aceptación
+        heatmap_data_aceptacion = merged_data.pivot_table(
+            index='Finca',
+            columns=producto_col_prod,
+            values='PorcentajeAceptacion',
+            fill_value=np.nan # Usar NaN para productos no producidos por una finca para distinguirlos visualmente
+        )
+
+        if not heatmap_data_aceptacion.empty:
+            # Ajustar la altura de la figura dinámicamente, con un máximo razonable
+            fig_height = min(12, max(6, len(heatmap_data_aceptacion) * 0.7)) # Mínimo 6, máximo 12
+            fig_width = min(20, max(10, len(heatmap_data_aceptacion.columns) * 0.5)) # Ancho dinámico
+
+            fig, ax = plt.subplots(figsize=(fig_width, fig_height)) # Crea la figura y los ejes
+            sns.heatmap(
+                heatmap_data_aceptacion,
+                annot=True,      # Mostrar los valores en las celdas
+                fmt=".1f",       # Formato de los números (un decimal)
+                cmap="YlGnBu",   # Esquema de color diferente para contraste
+                linewidths=.5,
+                linecolor='black',
+                cbar_kws={'label': 'Porcentaje de Aceptación (%)'}, # Leyenda de la barra de color
+                ax=ax            # Pasa los ejes al gráfico
+            )
+            ax.set_title(f'Porcentaje de Aceptación de Tallos por Finca y {producto_col_prod}', fontsize=16)
+            ax.set_xlabel(f'{producto_col_prod}', fontsize=14)
+            ax.set_ylabel('Finca', fontsize=14)
+            plt.xticks(rotation=45, ha='right')
+            plt.yticks(rotation=0)
+            plt.tight_layout()
+            st.pyplot(fig) # Muestra el gráfico en Streamlit
+            plt.close(fig) # ¡Cierra la figura para liberar memoria!
+
+        else:
+            st.info("No se encontraron datos procesados para generar el mapa de calor de Porcentaje de Aceptación. Esto podría deberse a filtros o datos vacíos después de las uniones.")
+    else:
+        st.warning(f"Las columnas **'Finca'**, **'Tallos'**, o **'{producto_col_prod}'** / **'{producto_col_ncp}'** no se encontraron en `df_produccion` o `df_ncp`. Asegúrate de que los nombres de las columnas sean correctos y existan en ambos DataFrames.")
+else:
+    st.warning("Uno o ambos DataFrames (**`df_produccion`**, **`df_ncp`**) están vacíos para este análisis. Asegúrate de que los datos se hayan cargado correctamente.")
