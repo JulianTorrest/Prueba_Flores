@@ -351,7 +351,79 @@ else:
 
 st.success("Análisis completado. ¡Explora tus datos!")
 
-# Problematica 7: Causas Principales de Pérdida (NCP)
+## Problemática 6: Fincas con Mayores Índices de Calidad No Conforme (NCC)
+
+if not df_ncc.empty and 'Tallos' in df_ncc.columns and 'Finca' in df_ncc.columns:
+    # Priorizar CausaAgrupada, si no, usar Causa
+    if 'CausaAgrupada' in df_ncc.columns and not df_ncc['CausaAgrupada'].isnull().all():
+        ncc_finca_causa = df_ncc.groupby(['Finca', 'CausaAgrupada'])['Tallos'].sum().nlargest(10).reset_index()
+        x_col = 'CausaAgrupada'
+    elif 'Causa' in df_ncc.columns:
+        ncc_finca_causa = df_ncc.groupby(['Finca', 'Causa'])['Tallos'].sum().nlargest(10).reset_index()
+        x_col = 'Causa'
+    else:
+        st.warning("No se encontraron las columnas 'CausaAgrupada' o 'Causa' en `df_ncc` para este análisis.")
+        ncc_finca_causa = pd.DataFrame() # Vaciar el DataFrame si no hay columnas de causa válidas
+
+    if not ncc_finca_causa.empty:
+        st.subheader('Top 10 Causas de Calidad No Conforme (NCC) por Finca')
+        fig_ncc, ax_ncc = plt.subplots(figsize=(14, 8))
+        # Usamos 'Finca' para hue para ver las diferentes fincas, y x_col para la causa.
+        sns.barplot(x=x_col, y='Tallos', hue='Finca', data=ncc_finca_causa, palette='tab10', ax=ax_ncc)
+        ax_ncc.set_title('Top 10 Causas de Calidad No Conforme (NCC) por Finca')
+        ax_ncc.set_xlabel('Causa de Calidad No Conforme')
+        ax_ncc.set_ylabel('Total de Tallos No Conformes')
+        plt.xticks(rotation=45, ha='right')
+        plt.legend(title='Finca', bbox_to_anchor=(1.05, 1), loc='upper left')
+        plt.tight_layout()
+
+        # Formatear el eje Y para evitar notación científica y mostrar enteros
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_ncc.yaxis.set_major_formatter(formatter)
+        ax_ncc.ticklabel_format(style='plain', axis='y')
+
+        st.pyplot(fig_ncc)
+    else:
+        st.info("No se encontraron datos de Calidad No Conforme (NCC) para analizar por Finca y Causa.")
+else:
+    st.warning("No se puede realizar el análisis de 'Fincas con Mayores Índices de Calidad No Conforme (NCC)'. Asegúrate de que `df_ncc` esté cargado y contenga las columnas 'Tallos', 'Finca', y al menos 'Causa' o 'CausaAgrupada'.")
+
+## Problemática 7: Comportamiento de Tallos por Ramo por Variedad
+
+if not df_produccion.empty and 'Tallos' in df_produccion.columns and 'Ramos' in df_produccion.columns and 'Variedad' in df_produccion.columns:
+    # Evitar división por cero y manejar casos donde Ramos es 0
+    df_produccion_clean = df_produccion[df_produccion['Ramos'] > 0].copy()
+
+    if not df_produccion_clean.empty:
+        df_produccion_clean['Tallos_por_Ramo'] = df_produccion_clean['Tallos'] / df_produccion_clean['Ramos']
+
+        # Calcular el promedio de tallos por ramo por variedad
+        tallos_por_ramo_por_variedad = df_produccion_clean.groupby('Variedad')['Tallos_por_Ramo'].mean().sort_values(ascending=False).reset_index()
+
+        # Podemos visualizar las 7 primeras y las 8 últimas para ver los extremos
+        top_low_varieties = pd.concat([tallos_por_ramo_por_variedad.head(7), tallos_por_ramo_por_variedad.tail(8)])
+
+        if not top_low_varieties.empty:
+            st.subheader('Promedio de Tallos por Ramo por Variedad (Extremos)')
+            fig_tpr, ax_tpr = plt.subplots(figsize=(14, 7))
+            sns.barplot(x='Variedad', y='Tallos_por_Ramo', hue='Variedad', data=top_low_varieties, palette='coolwarm', legend=False, ax=ax_tpr)
+            ax_tpr.set_title('Promedio de Tallos por Ramo por Variedad (Extremos)')
+            ax_tpr.set_xlabel('Variedad')
+            ax_tpr.set_ylabel('Promedio de Tallos por Ramo')
+            plt.xticks(rotation=60, ha='right')
+            plt.tight_layout()
+            st.pyplot(fig_tpr)
+        else:
+            st.info("No hay datos suficientes para mostrar el promedio de Tallos por Ramo por Variedad.")
+    else:
+        st.info("No hay datos de producción con Ramos > 0 para calcular Tallos por Ramo.")
+else:
+    st.warning("No se puede realizar el análisis de 'Comportamiento de Tallos por Ramo por Variedad'. Asegúrate de que `df_produccion` esté cargado y contenga las columnas 'Tallos', 'Ramos', y 'Variedad'.")
+
+st.success("Análisis completado. ¡Explora tus datos!")
+
+# Problematica 8: Causas Principales de Pérdida (NCP)
 st.subheader("Causas Principales de Pérdida (NCP)")
 if not df_ncp.empty and 'Tallos' in df_ncp.columns:
     if 'CausaAgrupada' in df_ncp.columns:
