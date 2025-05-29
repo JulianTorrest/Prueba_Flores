@@ -241,6 +241,116 @@ else:
 
 st.success("Análisis completado")
 
+## Problemática 4: ¿Qué Postcosechas o Fincas están Generando Más Descartes de Alta Calidad?
+
+if not df_ncp.empty and 'Grado' in df_ncp.columns and 'Tallos' in df_ncp.columns:
+    grados_alta_calidad = ['SUPER PREMIUM', 'PREMIUM', 'SELECT', 'FANCY']
+
+    ncp_alta_calidad = df_ncp[df_ncp['Grado'].isin(grados_alta_calidad)]
+
+    if not ncp_alta_calidad.empty:
+        st.info(f"Se encontraron pérdidas de tallos en los grados de alta calidad definidos: **{', '.join(grados_alta_calidad)}**")
+
+        if 'Postcosecha' in ncp_alta_calidad.columns:
+            # Por Postcosecha
+            perdida_alta_calidad_pc = ncp_alta_calidad.groupby('Postcosecha')['Tallos'].sum().sort_values(ascending=False).head(10).reset_index()
+            if not perdida_alta_calidad_pc.empty:
+                st.subheader('Tallos de Alta Calidad Perdidos (NCP) por Postcosecha')
+                fig_pc, ax_pc = plt.subplots(figsize=(12, 7))
+                sns.barplot(x='Postcosecha', y='Tallos', hue='Postcosecha', data=perdida_alta_calidad_pc, palette='viridis', legend=False, ax=ax_pc)
+                ax_pc.set_title('Tallos de Alta Calidad Perdidos (NCP) por Postcosecha')
+                ax_pc.set_xlabel('Postcosecha')
+                ax_pc.set_ylabel('Tallos de Alta Calidad Perdidos')
+                plt.xticks(rotation=45, ha='right')
+                plt.tight_layout()
+                st.pyplot(fig_pc)
+            else:
+                st.info("No hay datos de pérdidas de alta calidad por Postcosecha para mostrar.")
+        else:
+            st.warning("La columna 'Postcosecha' no se encontró en los datos de NCP para este análisis.")
+
+        if 'Finca' in ncp_alta_calidad.columns:
+            # Por Finca
+            perdida_alta_calidad_finca = ncp_alta_calidad.groupby('Finca')['Tallos'].sum().sort_values(ascending=False).head(10).reset_index()
+            if not perdida_alta_calidad_finca.empty:
+                st.subheader('Tallos de Alta Calidad Perdidos (NCP) por Finca')
+                fig_finca, ax_finca = plt.subplots(figsize=(12, 7))
+                sns.barplot(x='Finca', y='Tallos', hue='Finca', data=perdida_alta_calidad_finca, palette='cividis', legend=False, ax=ax_finca)
+                ax_finca.set_title('Tallos de Alta Calidad Perdidos (NCP) por Finca')
+                ax_finca.set_xlabel('Finca')
+                ax_finca.set_ylabel('Tallos de Alta Calidad Perdidos')
+                plt.xticks(rotation=45, ha='right')
+                plt.tight_layout()
+                st.pyplot(fig_finca)
+            else:
+                st.info("No hay datos de pérdidas de alta calidad por Finca para mostrar.")
+        else:
+            st.warning("La columna 'Finca' no se encontró en los datos de NCP para este análisis.")
+    else:
+        st.info(f"No se encontraron pérdidas de tallos en los grados de alta calidad definidos: **{', '.join(grados_alta_calidad)}**")
+else:
+    st.warning("No se puede realizar el análisis de 'Descartes de Alta Calidad'. Asegúrate de que `df_ncp` esté cargado y contenga las columnas 'Grado' y 'Tallos'.")
+
+## Problemática 5: ¿Qué Porcentaje de Nuestra Producción de Alto Grado está Siendo Descartado por Plagas/Enfermedades Específicas?
+
+if not df_produccion.empty and not df_ncp.empty and 'Grado' in df_produccion.columns and 'Tallos' in df_produccion.columns \
+   and 'Grado' in df_ncp.columns and 'Tallos' in df_ncp.columns and 'Causa' in df_ncp.columns:
+
+    grados_alta_calidad = ['SUPER PREMIUM', 'PREMIUM', 'SELECT', 'FANCY']
+
+    causas_plagas_enfermedades = [
+        'DAÑO POR THRIPS', 'ACAROS', 'PRESENCIA DE THRIPS', 'MILDEO POLVOSO',
+        'AFIDOS', 'MINADOR', 'MOSCA BLANCA', 'BOTRYTIS', 'ESCLEROTINEA',
+        'PROBLEMA FITOSANITARIO', 'ROYA PARDA'
+    ]
+
+    produccion_alta_calidad_tallos = df_produccion[df_produccion['Grado'].isin(grados_alta_calidad)]['Tallos'].sum()
+
+    if 'CausaAgrupada' in df_ncp.columns and not df_ncp['CausaAgrupada'].isnull().all():
+        st.info("Usando 'CausaAgrupada' para identificar las causas de plagas/enfermedades en las pérdidas y para el eje X del gráfico.")
+        ncp_alta_calidad_plagas_df = df_ncp[
+            (df_ncp['Grado'].isin(grados_alta_calidad)) &
+            (df_ncp['Causa'].isin(causas_plagas_enfermedades))
+        ]
+        campo_causa_final = 'CausaAgrupada'
+    else:
+        st.info("Usando 'Causa' directamente para identificar las causas de plagas/enfermedades en las pérdidas (CausaAgrupada no disponible o vacía).")
+        ncp_alta_calidad_plagas_df = df_ncp[
+            (df_ncp['Grado'].isin(grados_alta_calidad)) &
+            (df_ncp['Causa'].isin(causas_plagas_enfermedades))
+        ]
+        campo_causa_final = 'Causa'
+
+    ncp_alta_calidad_plagas = ncp_alta_calidad_plagas_df['Tallos'].sum()
+
+    if produccion_alta_calidad_tallos > 0:
+        porcentaje_perdida = (ncp_alta_calidad_plagas / produccion_alta_calidad_tallos) * 100
+        st.write(f"Porcentaje de tallos de alta calidad descartados por plagas/enfermedades: **{porcentaje_perdida:.2f}%**")
+
+        if not ncp_alta_calidad_plagas_df.empty:
+            perdida_por_plaga_grado_alto = ncp_alta_calidad_plagas_df.groupby(campo_causa_final)['Tallos'].sum().sort_values(ascending=False).reset_index()
+
+            if not perdida_por_plaga_grado_alto.empty:
+                st.subheader('Tallos de Alta Calidad Perdidos por Causas de Plagas/Enfermedades')
+                fig_plaga, ax_plaga = plt.subplots(figsize=(12, 7))
+                sns.barplot(x=campo_causa_final, y='Tallos', hue=campo_causa_final, data=perdida_por_plaga_grado_alto, palette='Greens_d', legend=False, ax=ax_plaga)
+                ax_plaga.set_title('Tallos de Alta Calidad Perdidos por Causas de Plagas/Enfermedades')
+                ax_plaga.set_xlabel(f'Causa ({campo_causa_final})')
+                ax_plaga.set_ylabel('Tallos Perdidos de Alta Calidad')
+                plt.xticks(rotation=45, ha='right')
+                plt.tight_layout()
+                st.pyplot(fig_plaga)
+            else:
+                st.info("No se encontraron pérdidas de tallos de alta calidad por las causas de plagas/enfermedades definidas para el desglose.")
+        else:
+            st.info("No hay datos de pérdidas de alta calidad por plagas/enfermedades después del filtrado para mostrar el desglose.")
+    else:
+        st.info("No hay producción de tallos de alta calidad registrada para este análisis.")
+else:
+    st.warning("No se puede realizar el análisis de 'Porcentaje de Producción de Alto Grado Descartado por Plagas/Enfermedades Específicas'. Asegúrate de que `df_produccion` y `df_ncp` estén cargados y contengan las columnas 'Grado', 'Tallos' y 'Causa'.")
+
+st.success("Análisis completado. ¡Explora tus datos!")
+
 # Problematica 7: Causas Principales de Pérdida (NCP)
 st.subheader("Causas Principales de Pérdida (NCP)")
 if not df_ncp.empty and 'Tallos' in df_ncp.columns:
