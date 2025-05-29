@@ -451,3 +451,136 @@ else:
     st.warning("No hay datos de NCP disponibles o la columna 'Tallos' no existe para el análisis de causas de pérdida.")
 
 st.success("Análisis completado. ¡Explora tus datos!")
+
+## Problemática 8: Distribución de Producción por Grado de Calidad
+
+if not df_produccion.empty and 'Grado' in df_produccion.columns and 'Tallos' in df_produccion.columns:
+    produccion_por_grado = df_produccion.groupby('Grado')['Tallos'].sum().reset_index()
+
+    if not produccion_por_grado.empty:
+        # Calcular el porcentaje para el gráfico de pastel o para etiquetas
+        produccion_por_grado['Porcentaje'] = (produccion_por_grado['Tallos'] / produccion_por_grado['Tallos'].sum()) * 100
+
+        st.subheader('Distribución Porcentual de Tallos Producidos por Grado de Calidad')
+        fig_pie, ax_pie = plt.subplots(figsize=(10, 10))
+        # Gráfico de pastel:
+        ax_pie.pie(produccion_por_grado['Tallos'], labels=produccion_por_grado['Grado'], autopct='%1.1f%%', startangle=90, colors=sns.color_palette("pastel"))
+        ax_pie.set_title('Distribución Porcentual de Tallos Producidos por Grado de Calidad')
+        ax_pie.axis('equal') # Para que el pastel sea un círculo
+        plt.tight_layout()
+        st.pyplot(fig_pie)
+
+        st.subheader('Total de Tallos Producidos por Grado de Calidad (Gráfico de Barras)')
+        # Gráfico de barras para mejor comparación visual de magnitudes
+        fig_bar_grado, ax_bar_grado = plt.subplots(figsize=(12, 7))
+        sns.barplot(x='Grado', y='Tallos', hue='Grado', data=produccion_por_grado.sort_values(by='Tallos', ascending=False), palette='coolwarm', legend=False, ax=ax_bar_grado)
+        ax_bar_grado.set_title('Total de Tallos Producidos por Grado de Calidad')
+        ax_bar_grado.set_xlabel('Grado de Calidad')
+        ax_bar_grado.set_ylabel('Total de Tallos')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+
+        # Formatear el eje Y para evitar notación científica y mostrar enteros
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_bar_grado.yaxis.set_major_formatter(formatter)
+        ax_bar_grado.ticklabel_format(style='plain', axis='y')
+
+        st.pyplot(fig_bar_grado)
+    else:
+        st.info("No se encontraron datos de producción por grado para el análisis.")
+else:
+    st.warning("No se puede realizar el análisis de 'Distribución de Producción por Grado de Calidad'. Asegúrate de que `df_produccion` esté cargado y contenga las columnas 'Grado' y 'Tallos'.")
+
+## Problemática 09: Impacto de Mala Marcación en Descarte de Tallos (NCP)
+
+if not df_ncp.empty and 'Causa' in df_ncp.columns and 'Tallos' in df_ncp.columns:
+    causas_marcacion_incorrecta = ['MALA MARCACION', 'MARCACIÓN INCORRECTA', 'ETIQUETA MAL IMPRESA']
+
+    # Asegurarse de que la columna 'Causa' es string para un filtrado seguro
+    df_ncp_clean = df_ncp.copy()
+    df_ncp_clean['Causa'] = df_ncp_clean['Causa'].astype(str)
+
+    tallos_por_mala_marcacion = df_ncp_clean[df_ncp_clean['Causa'].isin(causas_marcacion_incorrecta)]['Tallos'].sum()
+    total_tallos_ncp = df_ncp_clean['Tallos'].sum()
+
+    if total_tallos_ncp > 0:
+        porcentaje_mala_marcacion = (tallos_por_mala_marcacion / total_tallos_ncp) * 100
+        st.write(f"Total de tallos descartados por problemas de marcación: **{int(tallos_por_mala_marcacion)}** tallos")
+        st.write(f"Porcentaje de tallos descartados por problemas de marcación sobre el total de NCP: **{porcentaje_mala_marcacion:.2f}%**")
+
+        # Visualización de la proporción (gráfico de pastel simple)
+        if tallos_por_mala_marcacion > 0:
+            otros_ncp = total_tallos_ncp - tallos_por_mala_marcacion
+            data_pie = pd.DataFrame({'Tipo': ['Problemas de Marcación', 'Otros Descartados'], 'Tallos': [tallos_por_mala_marcacion, otros_ncp]})
+
+            st.subheader('Proporción de Tallos Descartados por Problemas de Marcación (NCP)')
+            fig_pie_marcacion, ax_pie_marcacion = plt.subplots(figsize=(8, 8))
+            ax_pie_marcacion.pie(data_pie['Tallos'], labels=data_pie['Tipo'], autopct='%1.1f%%', startangle=90, colors=['#FF9999', '#66B2FF'])
+            ax_pie_marcacion.set_title('Proporción de Tallos Descartados por Problemas de Marcación (NCP)')
+            ax_pie_marcacion.axis('equal')
+            plt.tight_layout()
+            st.pyplot(fig_pie_marcacion)
+        else:
+            st.info("No se encontraron tallos descartados por problemas de marcación específicos.")
+    else:
+        st.info("No hay tallos registrados en NCP para analizar problemas de marcación.")
+else:
+    st.warning("No se puede realizar el análisis de 'Impacto de Mala Marcación'. Asegúrate de que `df_ncp` esté cargado y contenga las columnas 'Causa' y 'Tallos'.")
+
+## Problemática 10 (Ajustada): Rendimiento Promedio de Tallos por Postcosecha por Jornada
+
+if not df_produccion.empty and 'Postcosecha' in df_produccion.columns and 'FechaJornada' in df_produccion.columns and 'Tallos' in df_produccion.columns:
+    df_produccion_clean = df_produccion.copy()
+    df_produccion_clean['Postcosecha'] = df_produccion_clean['Postcosecha'].astype(str)
+
+    # Sumar tallos por Postcosecha y jornada
+    rendimiento_diario_postcosecha = df_produccion_clean.groupby(['Postcosecha', 'FechaJornada'])['Tallos'].sum().reset_index()
+    rendimiento_diario_postcosecha.rename(columns={'Tallos': 'Tallos_Producidos'}, inplace=True)
+
+    # Calcular el promedio de rendimiento por Postcosecha a lo largo del tiempo
+    rendimiento_promedio_por_postcosecha = rendimiento_diario_postcosecha.groupby('Postcosecha')['Tallos_Producidos'].mean().sort_values(ascending=False).head(15).reset_index()
+
+    if not rendimiento_promedio_por_postcosecha.empty:
+        st.subheader('Top 15 Postcosechas por Rendimiento Promedio de Tallos por Jornada')
+        fig_rendimiento_bar, ax_rendimiento_bar = plt.subplots(figsize=(14, 8))
+        sns.barplot(x='Postcosecha', y='Tallos_Producidos', hue='Postcosecha', data=rendimiento_promedio_por_postcosecha, palette='Spectral', legend=False, ax=ax_rendimiento_bar)
+        ax_rendimiento_bar.set_title('Top 15 Postcosechas por Rendimiento Promedio de Tallos por Jornada')
+        ax_rendimiento_bar.set_xlabel('Postcosecha')
+        ax_rendimiento_bar.set_ylabel('Promedio de Tallos Producidos por Jornada')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+
+        # Formatear el eje Y
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_rendimiento_bar.yaxis.set_major_formatter(formatter)
+        ax_rendimiento_bar.ticklabel_format(style='plain', axis='y')
+
+        st.pyplot(fig_rendimiento_bar)
+
+        st.subheader('Distribución del Rendimiento Diario de Tallos por Postcosecha')
+        # Opcional: Para ver la distribución general del rendimiento diario por Postcosecha
+        fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
+        sns.histplot(rendimiento_diario_postcosecha['Tallos_Producidos'], bins=30, kde=True, color='skyblue', ax=ax_hist)
+        ax_hist.set_title('Distribución del Rendimiento Diario de Tallos por Postcosecha')
+        ax_hist.set_xlabel('Tallos Producidos por Jornada')
+        ax_hist.set_ylabel('Frecuencia')
+        plt.tight_layout()
+
+        # Formatear el eje X (Tallos Producidos)
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_hist.xaxis.set_major_formatter(formatter)
+        ax_hist.ticklabel_format(style='plain', axis='x')
+
+
+        st.pyplot(fig_hist)
+
+    else:
+        st.info("No hay datos de producción con información de Postcosecha y FechaJornada para calcular el rendimiento.")
+else:
+    st.warning("No se puede realizar el análisis de 'Rendimiento Promedio de Tallos por Postcosecha por Jornada'. Asegúrate de que `df_produccion` esté cargado y contenga las columnas 'Postcosecha', 'FechaJornada', y 'Tallos'.")
+
+st.success("Análisis completado. ¡Explora tus datos!")
+
