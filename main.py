@@ -186,6 +186,60 @@ if not df_produccion.empty and 'Variedad' in df_produccion.columns and 'Tallos' 
 else:
     st.warning("No se puede realizar el análisis de Tasa de Pérdida. Asegúrate de que `df_produccion` y `df_ncp` estén cargados y contengan las columnas 'Variedad' y 'Tallos'.")
 
+# Problemática 3: Estacionalidad de Producción y Pérdidas de Tallos
+st.subheader("Problemática 3: Estacionalidad de Producción y Pérdidas de Tallos")
+if not df_produccion.empty and 'FechaJornada' in df_produccion.columns and 'Tallos' in df_produccion.columns \
+   and not df_ncp.empty and 'FechaJornada' in df_ncp.columns and 'Tallos' in df_ncp.columns:
+
+    # Aseguramos que 'FechaJornada' esté en formato datetime antes de extraer el mes
+    if not pd.api.types.is_datetime64_any_dtype(df_produccion['FechaJornada']):
+        df_produccion['FechaJornada'] = pd.to_datetime(df_produccion['FechaJornada'], errors='coerce')
+    if not pd.api.types.is_datetime64_any_dtype(df_ncp['FechaJornada']):
+        df_ncp['FechaJornada'] = pd.to_datetime(df_ncp['FechaJornada'], errors='coerce')
+
+    # Eliminar filas con fechas nulas si se produjeron errores de conversión
+    df_produccion.dropna(subset=['FechaJornada'], inplace=True)
+    df_ncp.dropna(subset=['FechaJornada'], inplace=True)
+
+
+    df_produccion['Mes'] = df_produccion['FechaJornada'].dt.month
+    df_ncp['Mes'] = df_ncp['FechaJornada'].dt.month
+
+    produccion_mensual = df_produccion.groupby('Mes')['Tallos'].sum().reset_index(name='TallosProducidos')
+    ncp_mensual = df_ncp.groupby('Mes')['Tallos'].sum().reset_index(name='TallosPerdidos')
+
+    produccion_perdida_mensual = pd.merge(produccion_mensual, ncp_mensual, on='Mes', how='outer').fillna(0)
+
+    # Asegúrate de que las columnas numéricas sean int si son conteos
+    produccion_perdida_mensual['TallosProducidos'] = produccion_perdida_mensual['TallosProducidos'].astype(int)
+    produccion_perdida_mensual['TallosPerdidos'] = produccion_perdida_mensual['TallosPerdidos'].astype(int)
+
+    # Convertir a formato 'long' para seaborn.lineplot
+    produccion_perdida_mensual_melted = produccion_perdida_mensual.melt(id_vars='Mes', var_name='Tipo', value_name='Tallos')
+
+    if not produccion_perdida_mensual_melted.empty:
+        fig, ax = plt.subplots(figsize=(14, 7))
+        sns.lineplot(data=produccion_perdida_mensual_melted, x='Mes', y='Tallos', hue='Tipo', marker='o', palette={'TallosProducidos': 'green', 'TallosPerdidos': 'red'}, ax=ax)
+        ax.set_title('Estacionalidad de Producción y Pérdidas de Tallos')
+        ax.set_xlabel('Mes')
+        ax.set_ylabel('Total de Tallos')
+        plt.xticks(range(1, 13), ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'])
+        plt.legend(title='Tipo de Movimiento')
+        plt.tight_layout()
+
+        # Formatear el eje Y para evitar notación científica y mostrar enteros
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax.yaxis.set_major_formatter(formatter)
+        ax.ticklabel_format(style='plain', axis='y')
+
+        st.pyplot(fig) # Muestra el gráfico en Streamlit
+    else:
+        st.info("No hay datos suficientes para mostrar la estacionalidad de producción y pérdidas.")
+else:
+    st.warning("No se puede realizar el análisis de Estacionalidad. Asegúrate de que `df_produccion` y `df_ncp` estén cargados y contengan las columnas 'FechaJornada' y 'Tallos'.")
+
+st.success("Análisis completado")
 
 # Problematica 7: Causas Principales de Pérdida (NCP)
 st.subheader("Causas Principales de Pérdida (NCP)")
