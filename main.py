@@ -452,57 +452,7 @@ else:
 
 st.success("Análisis completado. ¡Explora tus datos!")
 
-## Problemática 9: Distribución de Producción por Grado de Calidad
-if not df_produccion.empty and 'Grado' in df_produccion.columns and 'Tallos' in df_produccion.columns:
-    # Agrupar por grado y sumar tallos
-    produccion_por_grado = df_produccion.groupby('Grado')['Tallos'].sum().reset_index()
-
-    if not produccion_por_grado.empty and produccion_por_grado['Tallos'].sum() > 0:
-        # Calcular el porcentaje de participación
-        produccion_por_grado['Porcentaje'] = (produccion_por_grado['Tallos'] / produccion_por_grado['Tallos'].sum()) * 100
-
-        # Gráfico de pastel
-        st.subheader('Distribución Porcentual de Tallos Producidos por Grado de Calidad')
-        fig_pie, ax_pie = plt.subplots(figsize=(8, 8))
-        ax_pie.pie(
-            produccion_por_grado['Tallos'],
-            labels=produccion_por_grado['Grado'],
-            autopct='%1.1f%%',
-            startangle=90,
-            colors=sns.color_palette("pastel")
-        )
-        ax_pie.set_title('Distribución Porcentual de Tallos Producidos por Grado de Calidad')
-        ax_pie.axis('equal')  # Asegura que el pastel sea circular
-        st.pyplot(fig_pie)    # Mostrar en Streamlit
-
-        # Gráfico de barras
-        st.subheader('Total de Tallos Producidos por Grado de Calidad (Gráfico de Barras)')
-        fig_bar, ax_bar = plt.subplots(figsize=(12, 6))
-        sns.barplot(
-            data=produccion_por_grado.sort_values(by='Tallos', ascending=False),
-            x='Grado',
-            y='Tallos',
-            palette='coolwarm',
-            ax=ax_bar
-        )
-        ax_bar.set_title('Total de Tallos Producidos por Grado de Calidad')
-        ax_bar.set_xlabel('Grado de Calidad')
-        ax_bar.set_ylabel('Total de Tallos')
-        plt.xticks(rotation=45, ha='right')
-
-        # Formatear el eje Y
-        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
-        formatter.set_scientific(False)
-        ax_bar.yaxis.set_major_formatter(formatter)
-        ax_bar.ticklabel_format(style='plain', axis='y')
-
-        st.pyplot(fig_bar)  # Mostrar en Streamlit
-
-    else:
-        st.info("No se encontraron datos válidos de producción por grado para graficar.")
-else:
-    st.warning("No se puede realizar el análisis de 'Distribución de Producción por Grado de Calidad'. Asegúrate de que `df_produccion` esté cargado y contenga las columnas 'Grado' y 'Tallos'.")
-## Problemática 10: Impacto de Mala Marcación en Descarte de Tallos (NCP)
+## Problemática 09: Impacto de Mala Marcación en Descarte de Tallos (NCP)
 
 if not df_ncp.empty and 'Causa' in df_ncp.columns and 'Tallos' in df_ncp.columns:
     causas_marcacion_incorrecta = ['MALA MARCACION', 'MARCACIÓN INCORRECTA', 'ETIQUETA MAL IMPRESA']
@@ -531,12 +481,70 @@ if not df_ncp.empty and 'Causa' in df_ncp.columns and 'Tallos' in df_ncp.columns
             ax_pie_marcacion.axis('equal')
             plt.tight_layout()
             st.pyplot(fig_pie_marcacion)
+            plt.close(fig_pie_marcacion) # CERRAR LA FIGURA
         else:
             st.info("No se encontraron tallos descartados por problemas de marcación específicos.")
     else:
         st.info("No hay tallos registrados en NCP para analizar problemas de marcación.")
 else:
     st.warning("No se puede realizar el análisis de 'Impacto de Mala Marcación'. Asegúrate de que `df_ncp` esté cargado y contenga las columnas 'Causa' y 'Tallos'.")
+
+## Problemática 10 (Ajustada): Rendimiento Promedio de Tallos por Postcosecha por Jornada
+
+if not df_produccion.empty and 'Postcosecha' in df_produccion.columns and 'FechaJornada' in df_produccion.columns and 'Tallos' in df_produccion.columns:
+    df_produccion_clean = df_produccion.copy()
+    df_produccion_clean['Postcosecha'] = df_produccion_clean['Postcosecha'].astype(str)
+
+    # Sumar tallos por Postcosecha y jornada
+    rendimiento_diario_postcosecha = df_produccion_clean.groupby(['Postcosecha', 'FechaJornada'])['Tallos'].sum().reset_index()
+    rendimiento_diario_postcosecha.rename(columns={'Tallos': 'Tallos_Producidos'}, inplace=True)
+
+    # Calcular el promedio de rendimiento por Postcosecha a lo largo del tiempo
+    rendimiento_promedio_por_postcosecha = rendimiento_diario_postcosecha.groupby('Postcosecha')['Tallos_Producidos'].mean().sort_values(ascending=False).head(15).reset_index()
+
+    if not rendimiento_promedio_por_postcosecha.empty:
+        st.subheader('Top 15 Postcosechas por Rendimiento Promedio de Tallos por Jornada')
+        fig_rendimiento_bar, ax_rendimiento_bar = plt.subplots(figsize=(14, 8))
+        sns.barplot(x='Postcosecha', y='Tallos_Producidos', hue='Postcosecha', data=rendimiento_promedio_por_postcosecha, palette='Spectral', legend=False, ax=ax_rendimiento_bar)
+        ax_rendimiento_bar.set_title('Top 15 Postcosechas por Rendimiento Promedio de Tallos por Jornada')
+        ax_rendimiento_bar.set_xlabel('Postcosecha')
+        ax_rendimiento_bar.set_ylabel('Promedio de Tallos Producidos por Jornada')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+
+        # Formatear el eje Y
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_rendimiento_bar.yaxis.set_major_formatter(formatter)
+        ax_rendimiento_bar.ticklabel_format(style='plain', axis='y')
+
+        st.pyplot(fig_rendimiento_bar)
+        plt.close(fig_rendimiento_bar) # CERRAR LA FIGURA
+
+        st.subheader('Distribución del Rendimiento Diario de Tallos por Postcosecha')
+        # Opcional: Para ver la distribución general del rendimiento diario por Postcosecha
+        fig_hist, ax_hist = plt.subplots(figsize=(10, 6))
+        sns.histplot(rendimiento_diario_postcosecha['Tallos_Producidos'], bins=30, kde=True, color='skyblue', ax=ax_hist)
+        ax_hist.set_title('Distribución del Rendimiento Diario de Tallos por Postcosecha')
+        ax_hist.set_xlabel('Tallos Producidos por Jornada')
+        ax_hist.set_ylabel('Frecuencia')
+        plt.tight_layout()
+
+        # Formatear el eje X (Tallos Producidos)
+        formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+        formatter.set_scientific(False)
+        ax_hist.xaxis.set_major_formatter(formatter)
+        ax_hist.ticklabel_format(style='plain', axis='x')
+
+        st.pyplot(fig_hist)
+        plt.close(fig_hist) # CERRAR LA FIGURA
+
+    else:
+        st.info("No hay datos de producción con información de Postcosecha y FechaJornada para calcular el rendimiento.")
+else:
+    st.warning("No se puede realizar el análisis de 'Rendimiento Promedio de Tallos por Postcosecha por Jornada'. Asegúrate de que `df_produccion` esté cargado y contenga las columnas 'Tallos', 'Postcosecha' y 'FechaJornada'.")
+
+st.success("¡Todos los análisis se han intentado generar! Revisa los mensajes de información y advertencia para cualquier detalle.")
 
 ## Problemática 11 (Ajustada): Rendimiento Promedio de Tallos por Postcosecha por Jornada
 
