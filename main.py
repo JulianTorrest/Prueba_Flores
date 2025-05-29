@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.ticker as mticker # Importar para formatear el eje Y
 
 st.set_page_config(layout="wide")
 st.title("Análisis de Datos de Flores - Producción y Causas")
@@ -45,8 +46,8 @@ try:
     ]
     df_inspeccion_causas = pd.read_excel(
         excel_file_causa_agrupado,
-        header=2,
-        usecols='E:Q',
+        header=2, # Asegúrate que este sea el encabezado correcto de tu tabla de inspección
+        usecols='E:Q', # Asegúrate que estas sean las columnas correctas
         names=column_names_inspeccion
     )
     df_inspeccion_causas = df_inspeccion_causas.dropna(how='all')
@@ -73,6 +74,8 @@ except Exception as e:
 
 ## Limpieza y Conversión de Datos
 
+st.subheader("Limpieza y Conversión de Datos")
+
 # Convertir columnas de fecha en formato datetime
 for df in [df_produccion, df_ncc, df_ncp]:
     if not df.empty:
@@ -96,6 +99,8 @@ for df in [df_produccion, df_ncc, df_ncp]:
 st.success("Limpieza y conversión de datos completada.")
 
 ## Uniendo DataFrames
+
+st.subheader("Uniendo DataFrames")
 
 if not df_produccion.empty and not df_causa_mapeo.empty:
     df_produccion = pd.merge(df_produccion, df_causa_mapeo, on='Causa', how='left')
@@ -140,9 +145,47 @@ if not df_produccion.empty and 'FechaJornada' in df_produccion.columns and 'Tall
     ax.set_ylabel('Total de Tallos')
     plt.xticks(rotation=45)
     plt.tight_layout()
+
+    # Formatear el eje Y para evitar notación científica y mostrar enteros
+    formatter = mticker.ScalarFormatter(useOffset=False, useMathText=False)
+    formatter.set_scientific(False)
+    ax.yaxis.set_major_formatter(formatter)
+    ax.ticklabel_format(style='plain', axis='y') # Intenta un estilo 'plain' adicional
+
     st.pyplot(fig)
 else:
     st.warning("No hay datos de producción disponibles o las columnas necesarias no existen para el análisis de producción total de tallos.")
+
+# Problematica 2: Variedades/Productos con Mayor Tasa de Pérdida
+st.subheader("Problemática 2: Variedades/Productos con Mayor Tasa de Pérdida")
+if not df_produccion.empty and 'Variedad' in df_produccion.columns and 'Tallos' in df_produccion.columns \
+   and not df_ncp.empty and 'Variedad' in df_ncp.columns and 'Tallos' in df_ncp.columns:
+
+    # Usaremos 'Variedad' como clave, si 'Producto' es más relevante puedes cambiarlo
+    produccion_por_item = df_produccion.groupby('Variedad')['Tallos'].sum().reset_index(name='ProduccionTallos')
+    ncp_por_item = df_ncp.groupby('Variedad')['Tallos'].sum().reset_index(name='NCPTallos')
+
+    merged_items = pd.merge(produccion_por_item, ncp_por_item, on='Variedad', how='left').fillna(0)
+
+    merged_items['TasaPerdida_Porcentaje'] = (merged_items['NCPTallos'] / merged_items['ProduccionTallos']) * 100
+    merged_items = merged_items[merged_items['ProduccionTallos'] > 0] # Excluir ítems sin producción
+
+    variedades_alta_perdida = merged_items.sort_values(by='TasaPerdida_Porcentaje', ascending=False).head(10)
+
+    if not variedades_alta_perdida.empty:
+        fig, ax = plt.subplots(figsize=(12, 7))
+        sns.barplot(x='Variedad', y='TasaPerdida_Porcentaje', hue='Variedad', data=variedades_alta_perdida, palette='Reds_d', legend=False, ax=ax)
+        ax.set_title('Top 10 Variedades con Mayor Tasa de Pérdida (NCP)')
+        ax.set_xlabel('Variedad')
+        ax.set_ylabel('Tasa de Pérdida (%)')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        st.pyplot(fig) # Muestra el gráfico en Streamlit
+    else:
+        st.info("No se encontraron variedades/productos con tasa de pérdida calculable para el análisis.")
+else:
+    st.warning("No se puede realizar el análisis de Tasa de Pérdida. Asegúrate de que `df_produccion` y `df_ncp` estén cargados y contengan las columnas 'Variedad' y 'Tallos'.")
+
 
 # Problematica 7: Causas Principales de Pérdida (NCP)
 st.subheader("Causas Principales de Pérdida (NCP)")
